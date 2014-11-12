@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # Author: Jan 'jarainf' Rathner <jan@rathner.net>
 
 from xml.dom import minidom
@@ -18,23 +18,23 @@ USAGE = '''\tgetbooru 1.0
 	Usage: getbooru [options] [tags]
 	
 	Options:
-	-h	--help					Displays this help page and exits
-	-a	--artist				Specify an artist to search for his works
-	-d	--destination				Specify a destination (default: .)
-		--delete-latest				Delete the latest changed file on SIGINT/SIGTERM
-							This is meant to prevent malicous files, because
-							of incomplete downloads.
-							WARNING: Only use if downloading to a dedicated folder
+	-h	--help					Display this help page and exit.
+	-a	--artist				Filter by given artist.
+	-d	--destination				Specify a destination (default: cwd).
+		--delete-latest				Delete the newest file on SIGINT/SIGTERM.
+							This is meant to prevent broken files caused
+							by incomplete downloads.
+							WARNING: Only use if downloading to a dedicated folder.
 							THIS MAY DELETE FILES YOU OR YOUR PC CREATED!
 	-f	--file-format				Specify a file format by its extension
 								(gif, jpg, jpeg, png)
-							Add a "-" in front to exclude this type
-	-n	--number-of-files			The number of files to look through
-	-q	--quiet					Quiet mode
-	-r	--rating				Specify the rating to retrieve files from (e.g. "safe", "questionable", "explicit")
-	-s	--size					Specify the resolution of files to download (e.g. "1920x1080")
-		--score					Specify a score limit (e.g. "<20", "20", ">20", ">=20", "<=20")
-	-t	--total					If added, downloads a total of "-n"-files, if possible
+							Add a "-" in front to exclude this type.
+	-n	--number-of-files			Process n posts.
+	-q	--quiet					Suppress output.
+	-r	--rating				Filter by rating (e.g. "safe", "questionable", "explicit").
+	-s	--size					Filter by resolution (e.g. "1920x1080").
+		--score					Filter by score (e.g. "<20", "20", ">20", ">=20", "<=20").
+	-t	--total					Guarantee that n pictures (see -n) will be downloaded.
 	'''
 
 def _parseURL(url, total = False, n = 0):
@@ -45,14 +45,14 @@ def _parseURL(url, total = False, n = 0):
 
 	xml = _getContent(url)
 	if xml is None:
-		print('XML-Data could not be retrieved.\nExiting...')
+		print('XML data could not be retrieved.\nExiting...')
 		return False
 
 	try:
 		parsedXml = minidom.parseString(xml)
 	except:
 		xmlerrors += 1
-		print('XML was malformatted, couldn\'t continue.\nExiting...')
+		print('XML was malformed, couldn\'t continue.\nExiting...')
 		return False
 
 	posts = parsedXml.getElementsByTagName('post')
@@ -63,29 +63,18 @@ def _parseURL(url, total = False, n = 0):
 	for i in posts:
 		images[i.attributes['id'].value] = i.attributes['file_url'].value
 
-	if not total:
-		for id, location in images.items():
-			filetype = location.rsplit('.', 1)[1]
-			if filetype not in fformat:
-				continue
-			filename = os.path.join(destination, id + '.' + filetype)
-			if os.path.isfile(filename):
-				duplicates += 1
-				continue
-			image = _getImage(location, filename)
-	else:
-		for id, location in images.items():
-			filetype = location.rsplit('.', 1)[1]
-			if filetype not in fformat:
-				continue
-			filename = os.path.join(destination, id + '.' + filetype)
-			if os.path.isfile(filename):
-				duplicates += 1
-				continue
-			image = _getImage(location, filename)
-			if not downloads < n:
-				print('return')
-				return False
+	for id, location in images.items():
+		filetype = location.rsplit('.', 1)[1]
+		if filetype not in fformat:
+			continue
+		filename = os.path.join(destination, id + '.' + filetype)
+		if os.path.isfile(filename):
+			duplicates += 1
+			continue
+		image = _getImage(location, filename)
+		if not downloads < n and total:
+			print('return')
+			return False
 
 	return True
 
@@ -170,7 +159,7 @@ def main():
 	inf = False
 
 	for opt, arg in opts:
-		if opt in ('-a', '--artists'):
+		if opt in ('-a', '--artist'):
 			tags += arg + ' '
 		elif opt in ('-d', '--destination'):
 			if arg != '':
@@ -238,30 +227,29 @@ def main():
 	if not inf and (not total or fformat == ('jpg', 'jpeg', 'gif', 'png')):
 		done = False
 		for i in (j for j in range(pages) if not done):
-			done = not _parseURL(url + '&limit=100&pid=' + str(i))
+			done = not _parseURL('%s&limit=100&pid=%d' % (url, i))
 		if last != 0 and not done:
-			_parseURL(url + '&limit=' + last + '&pid=' + str(pages))
+			_parseURL('%s&limit=%d&pid=%d' % (url, last, pages))
 	elif not inf:
 		done = False
 		i = 0
 		while not done:
-			print('lol')
-			done = not _parseURL(url + '&limit=100&pid=' + str(i), True, pages * 100 + last)
+			done = not _parseURL('%s&limit=100&pid=%d' % (url, i), True, pages * 100 + last)
 			i += 1
-		if xmlerrors == 0 and urlerrors == 0:
-			print('Done, total downloads: ' + str(downloads) + '.')
+		if (xmlerrors + urlerrors) == 0:
+			print('Done, total downloads: %03d.' % downloads)
 		else:
-			print('Done, total downloads: ' + str(downloads) + '. Errors: ' + str(xmlerrors) + ' XML-Errors, ' + str(urlerrors) + ' URL-Errors.')
+			print('Done, total downloads: %03d. XML-Errors: %03d, URL-Errors: %03d' % (downloads, xmlerrors, urlerrors))
 		sys.exit(0)
 
 	else:
 		i = 0
 		while _parseURL(url + '&limit=100&pid=' + str(i)):
 			i +=1
-	if xmlerrors == 0 and urlerrors == 0:
-		print('Done, total downloads: ' + str(downloads) + '. Already dowloaded: ' + str(duplicates) + '. Total: ' + str(duplicates + downloads) + '.')
+	if (xmlerrors + urlerrors) == 0:
+		print('Done, total downloads: %03d. Duplicates: %03d. Total: %03d.' % (downloads, duplicates, duplicates + downloads))
 	else:
-		print('Done, total downloads: ' + str(downloads) + '. Already dowloaded: ' + str(duplicates) + '. Total: ' + str(duplicates + downloads) + '. Errors: ' + str(xmlerrors) + ' XML-Errors, ' + str(urlerrors) + ' URL-Errors.')
+		print('Done, total downloads: %03d. Duplicates: %03d. Total: %03d. XML-Errors: %03d, URL-Errors: %03d.' % (downloads, duplicates, duplicates + downloads, xmlerrors, urlerrors))
 
 if __name__ == "__main__":
 	main()
