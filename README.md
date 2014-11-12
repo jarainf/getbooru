@@ -25,7 +25,7 @@ Crawls getbooru for images corresponding tags and options and downloads them.
 										of incomplete downloads.
 										WARNING: Only use if downloading to a dedicated folder
 										THIS MAY DELETE FILES YOU OR YOUR PC CREATED!
-		-f		--file-format			Specify a file format by it's extension
+		-f		--file-format			Specify a file format by its extension
 											(gif, jpg, jpeg, png)
 										Add a "-" in front to exclude this type
 		-n		--number-of-files		The number of files to look through

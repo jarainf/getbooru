@@ -26,7 +26,7 @@ USAGE = '''\tgetbooru 1.0
 							of incomplete downloads.
 							WARNING: Only use if downloading to a dedicated folder
 							THIS MAY DELETE FILES YOU OR YOUR PC CREATED!
-	-f	--file-format				Specify a file format by it's extension
+	-f	--file-format				Specify a file format by its extension
 								(gif, jpg, jpeg, png)
 							Add a "-" in front to exclude this type
 	-n	--number-of-files			The number of files to look through
@@ -66,7 +66,7 @@ def _parseURL(url, total = False, n = 0):
 	if not total:
 		for id, location in images.items():
 			filetype = location.rsplit('.', 1)[1]
-			if filetype not in format:
+			if filetype not in fformat:
 				continue
 			filename = os.path.join(destination, id + '.' + filetype)
 			if os.path.isfile(filename):
@@ -76,7 +76,7 @@ def _parseURL(url, total = False, n = 0):
 	else:
 		for id, location in images.items():
 			filetype = location.rsplit('.', 1)[1]
-			if filetype not in format:
+			if filetype not in fformat:
 				continue
 			filename = os.path.join(destination, id + '.' + filetype)
 			if os.path.isfile(filename):
@@ -151,7 +151,7 @@ def main():
 	global duplicates
 	global xmlerrors
 	global urlerrors
-	global format
+	global fformat
 	global destination
 
 	delete_latest = False
@@ -160,7 +160,7 @@ def main():
 	duplicates = 0
 	xmlerrors = 0
 	urlerrors = 0
-	format = ('jpg', 'jpeg', 'gif', 'png')
+	fformat = ('jpg', 'jpeg', 'gif', 'png')
 	destination = os.curdir
 
 	total = False
@@ -185,17 +185,17 @@ def main():
 			delete_latest = True
 		elif opt in ('-f', '--file-format'):
 			if arg in ('jpeg', 'jpg'):
-				format = ('jpeg', 'jpg')
+				fformat = ('jpeg', 'jpg')
 			elif arg == 'png':
-				format = 'png'
+				fformat = 'png'
 			elif arg == 'gif':
-				format = 'gif'
+				fformat = 'gif'
 			elif arg in ('-jpg', '-jpeg'):
-				format = ('gif', 'png')
+				fformat = ('gif', 'png')
 			elif arg == '-png':
-				format = ('jpg', 'jpeg', 'gif')
+				fformat = ('jpg', 'jpeg', 'gif')
 			elif arg == '-gif':
-				format = ('jpg', 'jpeg', 'png')
+				fformat = ('jpg', 'jpeg', 'png')
 			else:
 				print('Argument: \"' + arg + '\" not recognized, possible arguments:')
 				print('jpg, jpeg, gif, png, -jpg, -jpeg, -gif, -png')
@@ -235,7 +235,7 @@ def main():
 
 	url = GELBOORU + '&tags=' + quote_plus(tags)
 	
-	if not inf and (not total or format == ('jpg', 'jpeg', 'gif', 'png')):
+	if not inf and (not total or fformat == ('jpg', 'jpeg', 'gif', 'png')):
 		done = False
 		for i in (j for j in range(pages) if not done):
 			done = not _parseURL(url + '&limit=100&pid=' + str(i))
