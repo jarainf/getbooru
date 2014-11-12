@@ -227,14 +227,14 @@ def main():
 	if not inf and (not total or fformat == ('jpg', 'jpeg', 'gif', 'png')):
 		done = False
 		for i in (j for j in range(pages) if not done):
-			done = not _parseURL(url + '&limit=100&pid=' + str(i))
+			done = not _parseURL('%s&limit=100&pid=%d' % (url, i))
 		if last != 0 and not done:
-			_parseURL(url + '&limit=' + str(last) + '&pid=' + str(pages))
+			_parseURL('%s&limit=%d&pid=%d' % (url, last, pages))
 	elif not inf:
 		done = False
 		i = 0
 		while not done:
-			done = not _parseURL(url + '&limit=100&pid=' + str(i), True, pages * 100 + last)
+			done = not _parseURL('%s&limit=100&pid=%d' % (url, i), True, pages * 100 + last)
 			i += 1
 		if (xmlerrors + urlerrors) == 0:
 			print('Done, total downloads: %03d.' % downloads)
