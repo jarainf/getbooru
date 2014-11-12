@@ -63,7 +63,6 @@ def _parseURL(url, total = False, n = 0):
 	for i in posts:
 		images[i.attributes['id'].value] = i.attributes['file_url'].value
 
-
 	for id, location in images.items():
 		filetype = location.rsplit('.', 1)[1]
 		if filetype not in fformat:
