@@ -1,7 +1,7 @@
 getbooru
 ========
 
-Crawls getbooru for images corresponding tags and options and downloads them.
+Crawls Gelbooru for images corresponding tags and options and downloads them.
 
 # Requirements:
 - Python 3.4 (Should work on all versions of Python 3, but didn't test that)
