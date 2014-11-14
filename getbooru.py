@@ -110,7 +110,7 @@ def _usage():
 def _signals(signum = None, frame = None):
 	global destination
 	global delete_latest
-	if(delete_lastest):
+	if delete_latest:
 		latest = _latest_changed_file(destination)
 		try:
 			os.remove(latest)
