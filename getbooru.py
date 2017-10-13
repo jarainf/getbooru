@@ -4,6 +4,7 @@
 from xml.dom import minidom
 from urllib.request import urlopen, urlretrieve, URLError
 from urllib.parse import quote_plus
+from hashlib import md5 as md5_hasher
 import os
 import sys, getopt
 import signal
@@ -18,30 +19,35 @@ USAGE = '''\tgetbooru 1.0
 	Usage: getbooru [options] [tags]
 	
 	Options:
-	-h	--help					Display this help page and exit.
-	-a	--artist				Filter by given artist.
-	-d	--destination				Specify a destination (default: cwd).
-		--delete-latest				Delete the newest file on SIGINT/SIGTERM.
+	-h      --help                                  Display this help page and exit.
+	-a      --artist                                Filter by given artist.
+	-d      --destination                           Specify a destination (default: cwd).
+		--delete-latest                         Delete the newest file on SIGINT/SIGTERM.
 							This is meant to prevent broken files caused
 							by incomplete downloads.
 							WARNING: Only use if downloading to a dedicated folder.
 							THIS MAY DELETE FILES YOU OR YOUR PC CREATED!
-	-f	--file-format				Specify a file format by its extension
+	-f      --file-format                           Specify a file format by its extension
 								(gif, jpg, jpeg, png)
 							Add a "-" in front to exclude this type.
-	-n	--number-of-files			Process n posts.
-	-q	--quiet					Suppress output.
-	-r	--rating				Filter by rating (e.g. "safe", "questionable", "explicit").
-	-s	--size					Filter by resolution (e.g. "1920x1080").
-		--score					Filter by score (e.g. "<20", "20", ">20", ">=20", "<=20").
-	-t	--total					Guarantee that n pictures (see -n) will be downloaded.
+	-n      --number-of-files                       Process n posts.
+		--no-verification                       File checksums will not be verified.
+	-q      --quiet                                 Suppress output.
+	-r      --rating                                Filter by rating (e.g. "safe", "questionable", "explicit").
+	-s      --size                                  Filter by resolution (e.g. "1920x1080").
+		--score                                 Filter by score (e.g. "<20", "20", ">20", ">=20", "<=20").
+	-t      --total                                 Guarantee that n pictures (see -n) will be downloaded.
+	-v      --verbose                               Verbose mode.
 	'''
 
 def _parseURL(url, total = False, n = 0):
 	global duplicates
 	global xmlerrors
 
-	images = {}
+	images = []
+
+	if verbose:
+		print('Retrieving XML...')
 
 	xml = _getContent(url)
 	if xml is None:
@@ -61,19 +67,28 @@ def _parseURL(url, total = False, n = 0):
 		return False
 
 	for i in posts:
-		images[i.attributes['id'].value] = i.attributes['file_url'].value
+		images += {(i.attributes['id'].value, i.attributes['file_url'].value, i.attributes['md5'].value)}
 
-	for id, location in images.items():
+	for id, location, md5 in images:
 		filetype = location.rsplit('.', 1)[1]
 		if filetype not in fformat:
 			continue
-		filename = os.path.join(destination, id + '.' + filetype)
+		file = '%s.%s' % (id, filetype)
+		filename = os.path.join(destination, '%s' % (file))
 		if os.path.isfile(filename):
+			if verbose:
+				print('File "%s" is duplicate.' % (file))
+			if md5_checking and not _check_md5(filename, md5):
+				try:
+					os.remove(filename)
+					print('File "%s" differs in checksum, redownloading.' % (file))
+					image = _getImage(location, filename, md5)
+				except:
+					print('File "%s" differs in checksum, but could not be deleted.' % (file))
 			duplicates += 1
 			continue
-		image = _getImage(location, filename)
+		image = _getImage(location, filename, md5)
 		if not downloads < n and total:
-			print('return')
 			return False
 
 	return True
@@ -82,27 +97,33 @@ def _getContent(url):
 	global xmlerrors
 	data = None
 	try:
-		data = urlopen(url).readall()
+		with urlopen(url) as response:
+			return response.read()
 	except URLError as e:
 		xmlerrors += 1
 		if not quiet:
-			print('URL: ' + url + ' could not be opened.')
+			print('URL: %s could not be opened.' % (url))
 	return data
 
-def _getImage(url, file):
+def _getImage(url, file, md5 = '', errors = 0):
 	global downloads
 	global urlerrors
+	if verbose:
+		print('Downloading "%s"...' % (url))
 	try:
 		urlretrieve(url, file)
 		downloads += 1
 	except URLError as e:
 		urlerrors += 1
-		try:
-			os.remove(file)
-		except:
-			pass
-		if not quiet:
-			print('Image: ' + url + ' could not be retrieved.')
+		_delete_file(file, 'Image: %s could not be retrieved.' % (url))
+
+	if md5_checking and not _check_md5(file, md5):
+		_delete_file(file, 'Download "%s" differs in checksum, redownloading.' % (url))
+		errors += 1
+		if errors >= 5:
+			print('Download of "%s" failed checksum 5 times, aborting.' % (url))
+		_getImage(url, file, md5, errors)
+		
 
 def _usage():
 	print(USAGE)
@@ -112,10 +133,7 @@ def _signals(signum = None, frame = None):
 	global delete_latest
 	if delete_latest:
 		latest = _latest_changed_file(destination)
-		try:
-			os.remove(latest)
-		except:
-			print('Could not delete latest changed file. You should probably stop using Windows.')
+		_delete_file(latest, 'Could not delete latest changed file. You should probably stop using Windows.')
 	print('Interrupted, terminating...')
 	sys.exit(0)
 
@@ -126,9 +144,23 @@ def _latest_changed_file(dir):
 				yield os.path.join(dirpath, filename)
 	return max(list_files(dir), key=os.path.getmtime)
 
+def _check_md5(file, checksum):
+	m = md5_hasher()
+	m.update(open(file, 'rb').read())
+	return checksum == m.hexdigest()
+
+def _delete_file(file, output):
+	try:
+		os.remove(file)
+	except:
+		if not quiet:
+			print(output)
+		else:
+			pass
+
 def main():
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'a:d:f:hn:qr:s:t', ['rating=', 'help', 'quiet', 'size=' ,'score=', 'artist=', 'file-format=', 'total', 'number-of-files=', 'destination=', 'delete-latest'])
+		opts, args = getopt.getopt(sys.argv[1:], 'a:d:f:hn:qr:s:tv', ['rating=', 'help', 'quiet', 'size=' ,'score=', 'artist=', 'file-format=', 'total', 'number-of-files=', 'destination=', 'delete-latest', 'no-verification', 'verbose'])
 	except getopt.GetoptError as e:
 		print(e)
 		_usage()
@@ -142,6 +174,8 @@ def main():
 	global urlerrors
 	global fformat
 	global destination
+	global md5_checking
+	global verbose
 
 	delete_latest = False
 	quiet = False
@@ -153,21 +187,23 @@ def main():
 	destination = os.curdir
 
 	total = False
-	tags = ' '.join(args) + ' '
+	tags = '%s ' % (' '.join(args))
 	pages = 1
 	last = 0
 	inf = False
+	md5_checking = True
+	verbose = False
 
 	for opt, arg in opts:
 		if opt in ('-a', '--artist'):
-			tags += arg + ' '
+			tags += '%s ' % (arg)
 		elif opt in ('-d', '--destination'):
 			if arg != '':
 				if not os.path.exists(arg):
 					try:
 						os.makedirs(arg)
 					except:
-						print('Failed to create directory \"' + destination + '\", exiting.')
+						print('Failed to create directory \"%s\", exiting.' % (destination))
 						sys.exit(1)
 				destination = arg
 		elif opt == '--delete-latest':
@@ -186,7 +222,7 @@ def main():
 			elif arg == '-gif':
 				fformat = ('jpg', 'jpeg', 'png')
 			else:
-				print('Argument: \"' + arg + '\" not recognized, possible arguments:')
+				print('Argument: \"%s\" not recognized, possible arguments:' % (arg))
 				print('jpg, jpeg, gif, png, -jpg, -jpeg, -gif, -png')
 				print('Note that \"jpg\" and \"jpeg\" are the same format and specifying one of them will also download the other.')
 		elif opt in ('-h', '--help'):
@@ -202,27 +238,31 @@ def main():
 				print('You have to specify a number for \"-n\", using default (100).')
 				pages = 1
 				last = 0
+		elif opt == '--no-verification':
+			md5_checking = False
 		elif opt in ('-q', '--quiet'):
 			quiet = True
 		elif opt in ('-r', '--rating'):
-			tags += 'rating:' + arg + ' '
+			tags += 'rating:%s ' % (arg)
 		elif opt in ('-s', '--size'):
 			sarg = arg.split('x')
 			if len(sarg) == 2 and arg.replace('x', '').isdigit():
-				tags += 'width:' + sarg[0] + ' height:' + sarg[1] + ' '
+				tags += 'width:%s height:%s ' % (sarg[0], sarg[1])
 			else:
-				print('Invalid size formatting - should be \"$WIDTHx$HEIGHT\" but got: ' + arg + '\nExiting...')
+				print('Invalid size formatting - should be \"$WIDTHx$HEIGHT\" but got: %s\nExiting...' % (arg))
 		elif opt in ('-t', '--total'):
 			total = True
 		elif opt == '--score':
-			tags += 'score:' + arg + ' '
+			tags += 'score:%s ' % (arg)
+		elif opt in ('-v', '--verbose'):
+			verbose = True
 		else:
 			sys.exit(1)
 
 	for sig in [signal.SIGTERM, signal.SIGINT]:
 		signal.signal(sig, _signals)
 
-	url = GELBOORU + '&tags=' + quote_plus(tags)
+	url = '%s&tags=%s' % (GELBOORU, quote_plus(tags))
 	
 	if not inf and (not total or fformat == ('jpg', 'jpeg', 'gif', 'png')):
 		done = False
@@ -244,8 +284,8 @@ def main():
 
 	else:
 		i = 0
-		while _parseURL(url + '&limit=100&pid=' + str(i)):
-			i +=1
+		while _parseURL('%s&limit=100&pid=%s' % (url, str(i))):
+			i += 1
 	if (xmlerrors + urlerrors) == 0:
 		print('Done, total downloads: %03d. Duplicates: %03d. Total: %03d.' % (downloads, duplicates, duplicates + downloads))
 	else:
