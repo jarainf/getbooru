@@ -11,33 +11,33 @@ import signal
 
 GELBOORU = 'http://gelbooru.com/index.php?page=dapi&s=post&q=index'
 USAGE = '''\tgetbooru 1.0
-	A simple API-based Gelbooru crawler.
-	Author: Jan 'jarainf' Rathner
+        A simple API-based Gelbooru crawler.
+        Author: Jan 'jarainf' Rathner
 
-	http://github.com/jarainf/getbooru
-	
-	Usage: getbooru [options] [tags]
-	
-	Options:
-	-h      --help                                  Display this help page and exit.
-	-a      --artist                                Filter by given artist.
-	-d      --destination                           Specify a destination (default: cwd).
-		--delete-latest                         Delete the newest file on SIGINT/SIGTERM.
-							This is meant to prevent broken files caused
-							by incomplete downloads.
-							WARNING: Only use if downloading to a dedicated folder.
-							THIS MAY DELETE FILES YOU OR YOUR PC CREATED!
-	-f      --file-format                           Specify a file format by its extension
-								(gif, jpg, jpeg, png)
-							Add a "-" in front to exclude this type.
-	-n      --number-of-files                       Process n posts.
-		--no-verification                       File checksums will not be verified.
-	-q      --quiet                                 Suppress output.
-	-r      --rating                                Filter by rating (e.g. "safe", "questionable", "explicit").
-	-s      --size                                  Filter by resolution (e.g. "1920x1080").
-		--score                                 Filter by score (e.g. "<20", "20", ">20", ">=20", "<=20").
-	-t      --total                                 Guarantee that n pictures (see -n) will be downloaded.
-	-v      --verbose                               Verbose mode.
+        http://github.com/jarainf/getbooru
+        
+        Usage: getbooru [options] [tags]
+        
+        Options:
+        -h      --help                                  Display this help page and exit.
+        -a      --artist                                Filter by given artist.
+        -d      --destination                           Specify a destination (default: cwd).
+                --delete-latest                         Delete the newest file on SIGINT/SIGTERM.
+                                                        This is meant to prevent broken files caused
+                                                        by incomplete downloads.
+                                                        WARNING: Only use if downloading to a dedicated folder.
+                                                        THIS MAY DELETE FILES YOU OR YOUR PC CREATED!
+        -f      --file-format                           Specify a file format by its extension
+                                                                (gif, jpg, jpeg, png)
+                                                        Add a "-" in front to exclude this type.
+        -n      --number-of-files                       Process n posts.
+                --no-verification                       File checksums will not be verified.
+        -q      --quiet                                 Suppress output.
+        -r      --rating                                Filter by rating (e.g. "safe", "questionable", "explicit").
+        -s      --size                                  Filter by resolution (e.g. "1920x1080").
+                --score                                 Filter by score (e.g. "<20", "20", ">20", ">=20", "<=20").
+        -t      --total                                 Guarantee that n pictures (see -n) will be downloaded.
+        -v      --verbose                               Verbose mode.
 	'''
 
 def _parseURL(url, total = False, n = 0):
@@ -79,12 +79,9 @@ def _parseURL(url, total = False, n = 0):
 			if verbose:
 				print('File "%s" is duplicate.' % (file))
 			if md5_checking and not _check_md5(filename, md5):
-				try:
-					os.remove(filename)
-					print('File "%s" differs in checksum, redownloading.' % (file))
-					image = _getImage(location, filename, md5)
-				except:
-					print('File "%s" differs in checksum, but could not be deleted.' % (file))
+				_delete_file(filename, 'File "%s" differs in checksum, but could not be deleted.' % (file))
+				print('File "%s" differs in checksum, redownloading.' % (file))
+				image = _getImage(location, filename, md5)
 			duplicates += 1
 			continue
 		image = _getImage(location, filename, md5)
